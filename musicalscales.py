@@ -1,27 +1,8 @@
 import json
 import re
 import math 
-import unittest
+import argparse
 
-
-class MusicalNoteTests(unittest.TestCase):
-   def test_octaveNotation2semitonenumber(self):
-        assert MusicalNote.octaveNotation2semitonenumber("C#1")==13
-        assert MusicalNote.octaveNotation2semitonenumber("D")==2
-        
-   def test_frequency2note(self):
-        assert MusicalNote.frequency2note(16.35)[0] == "C0"
-        assert MusicalNote.frequency2note(444)[0] == "A4"
-        assert MusicalNote.frequency2note(452.8930)[0] == "A#4"
-        assert MusicalNote.frequency2note(7902.13)[0] == "B8"
-
-
-   
-
-class MusicalScaleTests(unittest.TestCase):
-    def test_1(self):
-        assert MusicalScale.scaleList2integerList(["A#2","A"])==[0,11]
-        assert MusicalScale.scaleString2integerList("A#2  A B ")==[0,11, 1]
 
 
 
@@ -30,7 +11,7 @@ class MusicalNote():
 
     
     @classmethod
-    def notes2num(cls,note):
+    def notes2num(cls,note: str):
 
         notes={ "C": 0 , "B#": 0,
                 "C#": 1, "Db": 1 , "C#/Db": 1 ,
@@ -47,19 +28,21 @@ class MusicalNote():
         return notes[note]
 
     @classmethod
-    def num2note(cls,num):
+    def num2note(cls,num: int):
         num2note1=[ "C", "C#", "D" , "D#",  "E", "F", "F#",  "G", "G#", "A", "A#", "B" ]
         return num2note1[num]
 
 
 
     @classmethod
-    def octaveNotation2semitonenumber(cls,notation):
+    def octaveNotation2semitonenumber(cls,notation: str):
         notation=notation.replace("♭","b")
         notation=notation.replace("♯","#")
         #  Octave notation to semitone number
         noteoctavere=r"([A-G](?:#|b)?)([0-9]+)?" 
         m=re.match(noteoctavere,notation)
+        if m==None:
+            raise Exception(f"String \"{notation}\" does not match musical letter notation")
         note=m.group(1)
         if m.group(2)==None:
             octave=0
@@ -68,7 +51,7 @@ class MusicalNote():
         return 12*int(octave)+cls.notes2num(note)
 
     @classmethod
-    def frequency2note(cls,frequency):
+    def frequency2note(cls,frequency: float):
 
         C0_Freq=440*2**(-4-9/12) 
         SEMITONES_IN_OCTAVE = 12
@@ -94,70 +77,67 @@ class MusicalNote():
 class MusicalScale(MusicalNote):
     
     @classmethod
-    def scaleList2integerList(cls,scale):
+    def scaleList2integerList(cls,scale: list):
     # String list scale to numeric differance scale
-
-        
-
         return [cls.octaveNotation2semitonenumber(note)%12 for note in scale]
     
     @classmethod
-    def numericDiff2integerList(cls,scale):
-        out=[]
-        s=0
-        for note in scale:
-            out.append(s)
-            s+=note
-        return out
-
+    def integerList2scaleList(cls,scale: list):
+        return [cls.num2note(note) for note in scale]
+    
     @classmethod
     def scaleString2integerList(cls,scale):
-        letterNoteationRe=r"^([A-Z][b,♭,#,♯]?[ ]+)*([A-Z][b,♭,#,♯]?)$"
-        m=re.match(letterNoteationRe,scale)
-        if m != None:
-            scaleList=scale.split(" ")
-            scaleList=[ a  for a in scaleList if a != "" ]
-            return cls.scaleList2integerList(scaleList)
+        letterNotationRe=r"([A-G](?:#|b)?)([0-9]+)?" 
+        matches=re.findall(letterNotationRe, scale)
+        if len(matches)>0:
+            listOfNotes=re.findall(r'([A-Z][b,♭,#,♯]?)', scale)
+            return cls.scaleList2integerList(listOfNotes)
         
-        integerNoteationRe=r"^\{1?[0-9]([ ]*,[ ]*1?[0-9][ ]*)*\}$"
+        integerNoteationRe=r"\{1?[0-9]([ ]*,[ ]*1?[0-9][ ]*)*\}"
         m=re.match(integerNoteationRe,scale)
         if m != None:
             listofstrs=re.findall(r'(\d+)', scale)
             return  [int(a) for a in listofstrs]
 
-        print("String does not match any support notation")
-        return []
+        raise Exception( "String does not match any notation")
 
     @classmethod
-    def compareScalesApproximatly(cls,scale,testscale):
+    def compareScalesApproximatly(cls,scale: list,testscale: list):
+        weights={
+                "startNotRoot":1,
+                "skipANote":1
+                 }
         if len(testscale)<1:
             return []
         listOfMatchIndexLists=[]
         for start in range(len(scale)):
             matchIndexList=[]
-            addtestscale=[(scale[start]+a)%12 for a in testscale]
+            rank=weights["startNotRoot"] if start>0 else 0 
+            addtestscale=[(scale[start]-testscale[0]+a)%12 for a in testscale]
             match=True
+            index=start
             for note in addtestscale:
-                if not note in scale:
+                if note==scale[index]: 
+                    # try next note in scale
+                    matchIndexList.append(index)
+                    index=(index+1)%len(scale)
+
+                elif note in scale:
+                    # try skipping forward in scale
+                    newindex=scale.index(note)
+                    rank+=weights["skipANote"]*((newindex-index)%len(scale))
+                    index=newindex
+                    matchIndexList.append(index)
+                    index=(index+1)%len(scale)
+
+                else:
                     match=False
                     break
-                matchIndexList.append(scale.index(note))
             if match:
-                #if not matchIndexList in listOfMatchIndexLists: #TODO Why?
-                listOfMatchIndexLists.append(matchIndexList)
+                listOfMatchIndexLists.append((matchIndexList,rank))
+
         return listOfMatchIndexLists
 
-    @classmethod
-    def rankApproxComparisons(cls,matchIndexList,intscale):
-        scalelenght=len(intscale)
-        if len(matchIndexList)<1:
-            return 0
-        points=0
-        if matchIndexList[0]!=0:
-            points+=1
-        for i in range(len(matchIndexList)-1):
-            points+= (matchIndexList[i+1]-matchIndexList[i]-1)%scalelenght  #step of 1 is best; 0 points
-        return points
 
 class ScaleMatchObject(MusicalScale):
     def __init__(self,scalename,intscale,offset,result,rank):
@@ -199,27 +179,27 @@ class ScaleMatchObject(MusicalScale):
                     markednotes+=f"{note} "
 
             key=self.num2note(self.intscale[0])
-            return f"{key} {self.name}  \n\t\t {markedscale} \t {markednotes} \t rank: {self.rank}"
+            return f"{key} {self.name}  \n\t {markedscale} \t {markednotes} \t rank: {self.rank}"
 
 class WesternScales(MusicalScale):
 
-    def __init__(self,scalesjson=None):
+    def __init__(self,scalesjson: str=None):
         if scalesjson==None:
             scalesjson="""
             {
             "Major": ["C", "D", "E", "F", "G", "A", "B"],
-            "NaturalMinor": ["C", "D", "Eb", "F", "G", "Ab", "Bb"],
-            "HarmonicMinor": ["C", "D", "Eb", "F", "G", "Ab", "B"],
-            "MelodicMinorAscending": ["C", "D", "Eb", "F", "G", "A", "B"],
-            "MelodicMinorDescending": ["C", "Bb", "Ab", "G", "F", "Eb", "D"],
+            "Natural Minor": ["C", "D", "Eb", "F", "G", "Ab", "Bb"],
+            "Harmonic Minor": ["C", "D", "Eb", "F", "G", "Ab", "B"],
+            "Melodic Minor Ascending": ["C", "D", "Eb", "F", "G", "A", "B"],
+            "Melodic Minor Descending": ["C", "Bb", "Ab", "G", "F", "Eb", "D"],
             "Dorian": ["C", "D", "Eb", "F", "G", "A", "Bb"],
             "Phrygian": ["C", "Db", "Eb", "F", "G", "Ab", "Bb"],
             "Lydian": ["C", "D", "E", "F#", "G", "A", "B"],
             "Mixolydian": ["C", "D", "E", "F", "G", "A", "Bb"],
             "Locrian":   ["C", "Db", "Eb", "F", "Gb", "Ab", "Bb"],
             "Blues": ["C", "Eb", "F", "F#", "G", "Bb"],
-            "PentatonicMajor": ["C", "D", "E", "G", "A"],
-            "PentatonicMinor": ["C", "Eb", "F", "G", "Bb"]
+            "Pentatonic Major": ["C", "D", "E", "G", "A"],
+            "Pentatonic Minor": ["C", "Eb", "F", "G", "Bb"]
             }
             """
 
@@ -230,13 +210,10 @@ class WesternScales(MusicalScale):
 
         self.intscales=intscales
 
-    def addScaleDiffList(self,name,newscale):
-        self.scales[name]=newscale
+    def setScale(self,name: str,newscale: str):
+        self.intscales[name]= self.scaleString2integerList(newscale)
 
-    def addScaleIntegerNotation(self,name,newscale):
-        self.scales[name]=self.integerList2numericDiff(newscale)
-
-    def compareAllScalesApprox(self,testscale):
+    def compareAllScalesApprox(self,testscale: list,threshold: int=3, maxreturns: int=5):
         if len(testscale)<1:
             return []
         matches=[]
@@ -244,42 +221,55 @@ class WesternScales(MusicalScale):
             intscale=self.intscales[scalename]
             results=self.compareScalesApproximatly(intscale,testscale)
             for result in results:
-                rank=self.rankApproxComparisons(result,intscale)
-                offset=testscale[0]-intscale[result[0]]
+                indexes=result[0]
+                rank=result[1]
+                offset=testscale[0]-intscale[indexes[0]]
                 intscaleoffset=[(a+offset)%12 for a in intscale]
+                if rank>threshold:
+                    continue
+                matches.append(ScaleMatchObject(scalename,intscaleoffset,offset,indexes,rank))
 
-                matches.append(ScaleMatchObject(scalename,intscaleoffset,offset,result,rank))
+        matches.sort()
 
-        return matches
+        end=min(maxreturns,len(matches))
+        return matches[:end]
 
 
-    def cli(self):
+def main():
+    parser = argparse.ArgumentParser(  
+         prog='Mucical Scale Matcher')
+    parser.add_argument('-t', '--threshold',default=3)  
+    parser.add_argument('-m', '--maxreturns',default=5)    
+    args = parser.parse_args()
+    print(""" Supported formats:
+1. Integer notation, example: {3, 5, 7, 8}
+2. Letter notation, example: C D Eb F#
+""")
+    while True:
+        ws=WesternScales()
+        inputScale=input()
+        try:
+            testscale=ws.scaleString2integerList(inputScale)
+        except:
+            print("""Input not recognized as a scale, exiting ...""")
+            break
+        letterTestScale=ws.integerList2scaleList(testscale)
         
-        while True:
-            print("""Type melody in:
-    1. Integer notation, example: {3, 5, 7, 8}
-    2. Letter notation, example: C D Eb F#
-    To exit to write exit """)
-            inputString=input()
-            if inputString=="exit":
-                exit()
-            testscale=MusicalScale.scaleString2integerList(inputString)
-            result=self.compareAllScalesApprox(testscale)
-            threshold=5
-            print(f"Matching scales guesses, low rank better:")
-            result.sort()
-            for a in result:
-                if a.rank<=threshold:
-                    print(a)
+        result=ws.compareAllScalesApprox(testscale,args.threshold,args.maxreturns)
+        if len(result)<1:
+            print(f"No matching scales below threshold {args.threshold}")
+            continue
+        print(f"""Matching melody {testscale} {" ".join(letterTestScale)} 
+Melody starts on () and continues with [], low rank better
+===========================================================
+              """)
+        for a in result:
+            print(a)
 
 
 
 if __name__ == '__main__': 
-    
-    ws=WesternScales()
+    main()
 
-    ws.cli()
-
-    #unittest.main()
     
 
