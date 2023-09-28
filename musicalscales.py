@@ -256,7 +256,7 @@ class WesternScales(MusicalScale):
         self.intscales[name]= self.scaleString2integerList(newscale)
         self.ranks[name]= rank
 
-    def compareAllScalesApprox(self,testscale: list,threshold: int=3, maxreturns: int=5) -> list:
+    def compareAllScalesApprox(self,testscale: list, maxreturns: int=5) -> list:
         if len(testscale)<1:
             return []
         matches=[]
@@ -269,8 +269,6 @@ class WesternScales(MusicalScale):
                 rank=result[1]+scalerank
                 offset=testscale[0]-intscale[indexes[0]]
                 intscaleoffset=[(a+offset)%12 for a in intscale]
-                if rank>threshold:
-                    continue
                 matches.append(ScaleMatchObject(scalename,intscaleoffset,offset,indexes,rank))
 
         matches.sort()
@@ -281,8 +279,7 @@ class WesternScales(MusicalScale):
 
 def main() -> None:
     parser = argparse.ArgumentParser(  
-         prog='Mucical Scale Matcher')
-    parser.add_argument('-t', '--threshold',default=10)  
+         prog='Mucical Scale Matcher') 
     parser.add_argument('-m', '--maxreturns',default=5)    
     parser.add_argument('-d', '--diminished',default=False, action='store_true')   
     args = parser.parse_args()
@@ -304,9 +301,9 @@ def main() -> None:
             break
         letterTestScale=ws.integerList2scaleList(testscale)
         
-        result=ws.compareAllScalesApprox(testscale,args.threshold,args.maxreturns)
+        result=ws.compareAllScalesApprox(testscale,args.maxreturns)
         if len(result)<1:
-            print(f"No matching scales below threshold {args.threshold}")
+            print(f"No matching scales")
             continue
         print(f"""Matching melody {testscale} {" ".join(letterTestScale)} 
 Melody starts on () and continues with [], low rank better
