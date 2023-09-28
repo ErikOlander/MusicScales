@@ -87,14 +87,13 @@ class MusicalScale(MusicalNote):
     
     @classmethod
     def scaleString2integerList(cls,scale: list) -> list:
-        letterNotationRe=r"([A-G](?:#|b)?)([0-9]+)?" 
-        matches=re.findall(letterNotationRe, scale)
-        if len(matches)>0:
-            listOfNotes=re.findall(r'([A-Z][b,♭,#,♯]?)', scale)
+        noteRegex=r"([A-Z][b,♭,#,♯]?[0-9]?)"
+        listOfNotes=re.findall(noteRegex, scale)
+        if listOfNotes!=[]:
             return cls.scaleList2integerList(listOfNotes)
         
-        integerNoteationRe=r"\{[ ]*1?[0-9]([ ]*,[ ]*1?[0-9][ ]*)*\}"
-        m=re.match(integerNoteationRe,scale)
+        integerNotationRe=r"\{(([0-9]|10|11),)*([0-9]|10|11)\}"
+        m=re.match(integerNotationRe,scale.replace(" ",""))
         if m != None:
             listofstrs=re.findall(r'(\d+)', scale)
             return  [int(a) for a in listofstrs]
@@ -284,7 +283,7 @@ def main() -> None:
     parser.add_argument('-d', '--diminished',default=False, action='store_true')   
     args = parser.parse_args()
     print(""" Supported formats:
-1. Integer notation, example: {3, 5, 7, 8}
+1. Integer notation 0-11, example: {3, 5, 7, 8}
 2. Letter notation, example: C D Eb F#
 """)
     while True:

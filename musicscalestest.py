@@ -21,8 +21,9 @@ class MusicalScaleTests(unittest.TestCase):
 
     def test_2(self):
         assert MusicalScale.scaleString2integerList("A#2  A B ")==[10,9, 11]
-        assert MusicalScale.scaleString2integerList("A♯2 , A♭, B ")==[10,8, 11]
-        assert MusicalScale.scaleString2integerList("A#2 - A - B ")==[10,9, 11]
+        assert MusicalScale.scaleString2integerList("A♯5 , A♭, B ")==[10,8, 11]
+        assert MusicalScale.scaleString2integerList("A#1 - A - B ")==[10,9, 11]
+        assert MusicalScale.scaleString2integerList("{10, 9, 11}")==[10,9, 11]
 
 class WestenScalesTest(unittest.TestCase):
     def test_matchscale(self):
