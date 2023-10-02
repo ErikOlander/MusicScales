@@ -306,7 +306,7 @@ class WesternScales(MusicalScale):
 def main() -> None:
     parser = argparse.ArgumentParser(  
          prog='Mucical Scale Matcher') 
-    parser.add_argument('-m', '--maxreturns',default=5)    
+    parser.add_argument('-m', '--maxreturns',default=10)    
     args = parser.parse_args()
     print(""" Supported formats:
 1. Integer notation 0-11, example: {3, 5, 7, 8}
@@ -343,7 +343,7 @@ the matching is invariant to order other than root
 
         letterTestScale=ws.integerList2scaleList(testscale)
         
-        result=ws.compareAllScalesApprox(testscale,args.maxreturns)
+        result=ws.compareAllScales(testscale,args.maxreturns)
         if len(result)<1:
             print(f"No matching scales")
             continue
@@ -354,7 +354,7 @@ Melody starts on () and continues with [], low rank better
         for a in result:
             print(a)
 
-
+        print("\n\n\n")
 
 if __name__ == '__main__': 
     main()
