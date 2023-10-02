@@ -75,7 +75,7 @@ class MusicalNote():
 
 
 class MusicalScale(MusicalNote):
-    
+
     @classmethod
     def scaleList2integerList(cls,scale: list) -> list:
     # String list scale to numeric differance scale
@@ -85,8 +85,9 @@ class MusicalScale(MusicalNote):
     def integerList2scaleList(cls,scale: list) -> list:
         return [cls.num2note(note) for note in scale]
     
+
     @classmethod
-    def scaleString2integerList(cls,scale: list) -> list:
+    def scaleString2integerList(cls,scale: str) -> list:
         noteRegex=r"([A-Z][b,♭,#,♯]?[0-9]?)"
         listOfNotes=re.findall(noteRegex, scale)
         if listOfNotes!=[]:
@@ -98,12 +99,15 @@ class MusicalScale(MusicalNote):
             listofstrs=re.findall(r'(\d+)', scale)
             return  [int(a) for a in listofstrs]
 
+
         raise Exception( "String does not match any notation")
 
     @classmethod
-    def compareScalesApproximatly(cls,scale: list,testscale: list) -> list:
+    def compareScales(cls,scale: list,testscale: list) -> list:
+        #Should be acending mod 12
+
         weights={
-                "startNotRoot":1,
+                "startNotRoot":3,
                 "skipANote":1
                  }
         if len(testscale)<1:
@@ -113,29 +117,43 @@ class MusicalScale(MusicalNote):
             matchIndexList=[]
             rank=weights["startNotRoot"] if start>0 else 0 
             addtestscale=[(scale[start]-testscale[0]+a)%12 for a in testscale]
+            
             match=True
-            index=start
             for note in addtestscale:
-                if note==scale[index]: 
-                    # try next note in scale
-                    matchIndexList.append(index)
-                    index=(index+1)%len(scale)
-
-                elif note in scale:
-                    # try skipping forward in scale
-                    newindex=scale.index(note)
-                    rank+=weights["skipANote"]*((newindex-index)%len(scale))
-                    index=newindex
-                    matchIndexList.append(index)
-                    index=(index+1)%len(scale)
-
-                else:
+                if not note in scale:
                     match=False
                     break
+                matchIndexList.append(scale.index(note))
+
+            skippedNotes=len(scale)-len(addtestscale)
+            
+            rank+=skippedNotes*weights["skipANote"]
             if match:
                 listOfMatchIndexLists.append((matchIndexList,rank))
 
         return listOfMatchIndexLists
+
+    @classmethod
+    def melody2Scale(cls,melody):
+        #identify root note
+        counter=[0]*12
+        for note in melody:
+            counter[note] +=1
+
+        counter[melody[0]]+=5
+        counter[melody[-1]]+=4
+
+        maxindex=counter.index(max(counter))
+        root=melody[maxindex]
+    
+        normalizedScale=[(a-root)%12 for a in melody]
+
+        normalizedScale=list(set(normalizedScale)) #remove duplicates
+        normalizedScale.sort()
+
+        scale=[(a+root)%12 for a in normalizedScale]
+        return scale
+
 
 
 class ScaleMatchObject(MusicalScale):
@@ -198,14 +216,6 @@ class WesternScales(MusicalScale):
         "scale": ["C", "D", "Eb", "F", "G", "Ab", "B"],
         "rank": 1
     },
-    "Melodic Minor Ascending": {
-        "scale": ["C", "D", "Eb", "F", "G", "A", "B"],
-        "rank": 1
-    },
-    "Melodic Minor Descending": {
-        "scale": ["C", "Bb", "Ab", "G", "F", "Eb", "D"],
-        "rank": 3
-    },
     "Dorian": {
         "scale": ["C", "D", "Eb", "F", "G", "A", "Bb"],
         "rank": 1
@@ -255,14 +265,31 @@ class WesternScales(MusicalScale):
         self.intscales[name]= self.scaleString2integerList(newscale)
         self.ranks[name]= rank
 
-    def compareAllScalesApprox(self,testscale: list, maxreturns: int=5) -> list:
+    def shiftNamedScale(self,name,key):
+        scale=self.intscales[name]
+        firstnote=scale[0]
+        shiftedScale=[ (a+key-firstnote)%12  for a in scale]
+        return shiftedScale
+
+
+    def scaleKey2integerList(self,scale) -> list:
+        scaleKeyRegex=r"([A-Z][b,♭,#,♯]?[0-9]?) ([A-Za-z ]+)"
+        m=re.search(scaleKeyRegex,scale)
+        if m != None:
+            name=m.group(2).strip(" ")
+            key=self.octaveNotation2semitonenumber( m.group(1))%12
+            return self.shiftNamedScale(name,key)
+
+
+    def compareAllScales(self,testscale: list, maxreturns: int=5) -> list:
+        #Should be acending mod 12
         if len(testscale)<1:
             return []
         matches=[]
         for scalename in self.intscales:
             intscale=self.intscales[scalename]
             scalerank=self.ranks[scalename]
-            results=self.compareScalesApproximatly(intscale,testscale)
+            results=self.compareScales(intscale,testscale)
             for result in results:
                 indexes=result[0]
                 rank=result[1]+scalerank
@@ -280,24 +307,40 @@ def main() -> None:
     parser = argparse.ArgumentParser(  
          prog='Mucical Scale Matcher') 
     parser.add_argument('-m', '--maxreturns',default=5)    
-    parser.add_argument('-d', '--diminished',default=False, action='store_true')   
     args = parser.parse_args()
     print(""" Supported formats:
 1. Integer notation 0-11, example: {3, 5, 7, 8}
 2. Letter notation, example: C D Eb F#
+3. Key and scale name, example: D Natural Minor
+the matching is invariant to order other than root
 """)
-    while True:
-        ws=WesternScales()
-        if args.diminished:
-            ws.setScale("Diminished Whole Half","{0, 2, 3, 5, 6, 8, 9,11}",5)
+    ws=WesternScales()
 
+    while True:
 
         inputScale=input()
+        if inputScale=="" or inputScale=="exit":
+            print("""Exiting""")
+            break
+
+        testscale=None
+        try:
+            testscale=ws.scaleKey2integerList(inputScale)
+            
+            #already acending
+        except:
+            pass
         try:
             testscale=ws.scaleString2integerList(inputScale)
+            testscale=ws.melody2Scale(testscale)
         except:
-            print("""Input not recognized as a scale, exiting ...""")
-            break
+            pass
+
+        if testscale==None:
+            print("""Input not recognized as a scale, configured scales:""")
+            print ("\n".join([name for name in ws.intscales]))
+            continue
+
         letterTestScale=ws.integerList2scaleList(testscale)
         
         result=ws.compareAllScalesApprox(testscale,args.maxreturns)

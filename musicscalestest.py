@@ -26,17 +26,23 @@ class MusicalScaleTests(unittest.TestCase):
         assert MusicalScale.scaleString2integerList("{10, 9, 11}")==[10,9, 11]
 
 class WestenScalesTest(unittest.TestCase):
-    def test_matchscale(self):
+    def test_major(self):
         ws=WesternScales()
         testscale=ws.scaleString2integerList("C D E F G")
-        result=ws.compareAllScalesApprox(testscale)
+        result=ws.compareAllScales(testscale)
         assert result[0].name=="Major"
+
+    def test_blues(self):
+        ws=WesternScales()
+        testscale=ws.scaleString2integerList("C D# F F# G")
+        result=ws.compareAllScales(testscale)
+        assert result[0].name=="Blues"
 
     def test_setscale(self):
         ws=WesternScales()
         ws.setScale("Diminished Whole Half","{0, 2, 3, 5, 6, 8, 9,11}",1)
         assert ws.intscales["Diminished Whole Half"]==[0, 2, 3, 5, 6, 8, 9, 11]
-        result=ws.compareAllScalesApprox([2, 3, 5, 6, 8, 9,11, 0])
+        result=ws.compareAllScales([2, 3, 5, 6, 8, 9,11, 0])
         assert result[0].name=="Diminished Whole Half"
 
 
